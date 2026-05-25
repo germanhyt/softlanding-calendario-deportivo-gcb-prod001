@@ -1,0 +1,285 @@
+---
+const slides = [
+	{
+		src: '/slides/01-agenda-deportiva.png',
+		alt: 'Agenda Deportiva — 25 al 31 de Mayo',
+	},
+	{
+		src: '/slides/02-pasion-deporte.png',
+		alt: 'La pasión del deporte se vive aquí — Refugio Gastronómico',
+	},
+	{
+		src: '/slides/03-futbol-internacional.png',
+		alt: 'Fútbol Internacional — Partidos destacados',
+	},
+	{
+		src: '/slides/04-futbol-peruano.png',
+		alt: 'Fútbol Peruano — Partidos destacados',
+	},
+	{
+		src: '/slides/05-voley-peruano.png',
+		alt: 'Vóley Peruano — Partidos destacados',
+	},
+	{
+		src: '/slides/06-ufc.png',
+		alt: 'UFC — Peleas destacadas',
+	},
+];
+---
+
+<section class="carousel" aria-label="Agenda deportiva semanal">
+	<div class="swiper sports-swiper">
+		<div class="swiper-wrapper">
+			{
+				slides.map((slide) => (
+					<div class="swiper-slide">
+						<img src={slide.src} alt={slide.alt} loading={slide.src.includes('01-') ? 'eager' : 'lazy'} />
+					</div>
+				))
+			}
+		</div>
+
+		<button type="button" class="swiper-button-prev" aria-label="Slide anterior"></button>
+		<button type="button" class="swiper-button-next" aria-label="Slide siguiente"></button>
+		<div class="swiper-pagination"></div>
+	</div>
+
+	<p class="carousel-hint" aria-hidden="true">
+		<span class="carousel-hint__chevrons">›››</span>
+		Desliza o usa las flechas
+	</p>
+</section>
+
+<script>
+	import Swiper from 'swiper';
+	import { Navigation, Pagination, EffectCreative, Keyboard, Mousewheel, A11y } from 'swiper/modules';
+	import 'swiper/css';
+	import 'swiper/css/navigation';
+	import 'swiper/css/pagination';
+	import 'swiper/css/effect-creative';
+
+	function initCarousel() {
+		const el = document.querySelector<HTMLElement>('.sports-swiper');
+		if (!el || el.dataset.initialized === 'true') return;
+
+		el.dataset.initialized = 'true';
+
+		new Swiper(el, {
+			modules: [Navigation, Pagination, EffectCreative, Keyboard, Mousewheel, A11y],
+			effect: 'creative',
+			creativeEffect: {
+				prev: {
+					shadow: true,
+					translate: ['-110%', 0, -400],
+					rotate: [0, 0, -8],
+					opacity: 0,
+				},
+				next: {
+					shadow: true,
+					translate: ['110%', 0, -400],
+					rotate: [0, 0, 8],
+					opacity: 0,
+				},
+			},
+			loop: true,
+			speed: 650,
+			grabCursor: true,
+			keyboard: { enabled: true, onlyInViewport: true },
+			mousewheel: {
+				forceToAxis: true,
+				sensitivity: 1,
+				thresholdDelta: 20,
+			},
+			navigation: {
+				nextEl: '.swiper-button-next',
+				prevEl: '.swiper-button-prev',
+			},
+			pagination: {
+				el: '.swiper-pagination',
+				clickable: true,
+				dynamicBullets: true,
+			},
+			a11y: {
+				prevSlideMessage: 'Slide anterior',
+				nextSlideMessage: 'Slide siguiente',
+				paginationBulletMessage: 'Ir al slide {{index}}',
+			},
+		});
+	}
+
+	initCarousel();
+	document.addEventListener('astro:page-load', initCarousel);
+</script>
+
+<style>
+	.carousel {
+		position: relative;
+		width: 100vw;
+		height: 100dvh;
+		background: radial-gradient(ellipse at center, #142014 0%, #0a1209 70%);
+	}
+
+	.sports-swiper {
+		width: 100%;
+		height: 100%;
+	}
+
+	.swiper-slide {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+			env(safe-area-inset-left);
+	}
+
+	.swiper-slide img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		object-position: center;
+		user-select: none;
+		-webkit-user-drag: none;
+		pointer-events: none;
+	}
+
+	.carousel-hint {
+		position: absolute;
+		bottom: calc(1.25rem + env(safe-area-inset-bottom));
+		left: 50%;
+		transform: translateX(-50%);
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.15rem;
+		color: rgba(255, 255, 255, 0.55);
+		font-size: 0.7rem;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		pointer-events: none;
+		z-index: 5;
+		animation: hint-fade 4s ease forwards;
+	}
+
+	.carousel-hint__chevrons {
+		display: block;
+		font-size: 1rem;
+		line-height: 1;
+		letter-spacing: -0.15em;
+		animation: hint-bounce 1.6s ease-in-out infinite;
+	}
+
+	@keyframes hint-fade {
+		0%,
+		70% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 0;
+		}
+	}
+
+	@keyframes hint-bounce {
+		0%,
+		100% {
+			transform: translateX(0);
+		}
+		50% {
+			transform: translateX(4px);
+		}
+	}
+
+	@media (min-width: 768px) {
+		.swiper-slide img {
+			max-width: min(100%, 480px);
+		}
+	}
+</style>
+
+<style is:global>
+	.sports-swiper .swiper-button-prev,
+	.sports-swiper .swiper-button-next {
+		color: #fff;
+		width: 2rem;
+		height: 2rem;
+		margin-top: -1rem;
+		border-radius: 50%;
+		background: rgba(0, 0, 0, 0.2);
+		border: none;
+		opacity: 0;
+		transition:
+			opacity 0.3s ease,
+			background 0.2s ease,
+			transform 0.2s ease;
+	}
+
+	.sports-swiper .swiper-button-prev::after,
+	.sports-swiper .swiper-button-next::after {
+		font-size: 0.85rem;
+		font-weight: 600;
+	}
+
+	.carousel:hover .sports-swiper .swiper-button-prev,
+	.carousel:hover .sports-swiper .swiper-button-next,
+	.carousel:focus-within .sports-swiper .swiper-button-prev,
+	.carousel:focus-within .sports-swiper .swiper-button-next {
+		opacity: 0.45;
+	}
+
+	.sports-swiper .swiper-button-prev:hover,
+	.sports-swiper .swiper-button-next:hover {
+		opacity: 0.9;
+		background: rgba(0, 0, 0, 0.35);
+	}
+
+	.sports-swiper .swiper-button-prev:active,
+	.sports-swiper .swiper-button-next:active {
+		transform: scale(0.94);
+	}
+
+	.sports-swiper .swiper-button-prev {
+		left: 0.5rem;
+	}
+
+	.sports-swiper .swiper-button-next {
+		right: 0.5rem;
+	}
+
+	.sports-swiper .swiper-pagination {
+		bottom: calc(0.75rem + env(safe-area-inset-bottom));
+		left: 0;
+		width: 100%;
+	}
+
+	.sports-swiper .swiper-pagination-bullet {
+		width: 0.45rem;
+		height: 0.45rem;
+		background: rgba(255, 255, 255, 0.35);
+		opacity: 1;
+		transition:
+			transform 0.25s ease,
+			background 0.25s ease;
+	}
+
+	.sports-swiper .swiper-pagination-bullet-active {
+		background: #fff;
+		transform: scale(1.35);
+	}
+
+	@media (hover: none), (pointer: coarse) {
+		.sports-swiper .swiper-button-prev,
+		.sports-swiper .swiper-button-next {
+			display: none;
+		}
+	}
+
+	@media (min-width: 768px) {
+		.sports-swiper .swiper-button-prev {
+			left: 0.75rem;
+		}
+
+		.sports-swiper .swiper-button-next {
+			right: 0.75rem;
+		}
+	}
+</style>
