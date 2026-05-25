@@ -52,7 +52,7 @@ const slides = [
 
 <script>
 	import Swiper from 'swiper';
-	import { Navigation, Pagination, EffectCreative, Keyboard, Mousewheel, A11y } from 'swiper/modules';
+	import { Navigation, Pagination, EffectCreative, Keyboard, Mousewheel, A11y, Autoplay } from 'swiper/modules';
 	import 'swiper/css';
 	import 'swiper/css/navigation';
 	import 'swiper/css/pagination';
@@ -65,7 +65,7 @@ const slides = [
 		el.dataset.initialized = 'true';
 
 		new Swiper(el, {
-			modules: [Navigation, Pagination, EffectCreative, Keyboard, Mousewheel, A11y],
+			modules: [Navigation, Pagination, EffectCreative, Keyboard, Mousewheel, A11y, Autoplay],
 			effect: 'creative',
 			creativeEffect: {
 				prev: {
@@ -83,6 +83,11 @@ const slides = [
 			},
 			loop: true,
 			speed: 650,
+			autoplay: {
+				delay: 10000,
+				pauseOnMouseEnter: true,
+				disableOnInteraction: false,
+			},
 			grabCursor: true,
 			keyboard: { enabled: true, onlyInViewport: true },
 			mousewheel: {
