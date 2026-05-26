@@ -28,6 +28,17 @@ const slides = [
 ---
 
 <section class="carousel" aria-label="Agenda deportiva semanal">
+	<button
+		type="button"
+		class="carousel-mode-toggle"
+		aria-label="Cambiar entre modo kiosk y modo celular"
+		aria-pressed="false"
+	>
+		<span class="carousel-mode-toggle__track">
+			<span class="carousel-mode-toggle__thumb"></span>
+		</span>
+	</button>
+
 	<div class="swiper sports-swiper">
 		<div class="swiper-wrapper">
 			{
@@ -57,6 +68,54 @@ const slides = [
 	import 'swiper/css/navigation';
 	import 'swiper/css/pagination';
 	import 'swiper/css/effect-creative';
+
+	const DISPLAY_MODE_KEY = 'catelera-display-mode';
+	type DisplayMode = 'kiosk' | 'normal';
+
+	function detectKiosk(): boolean {
+		const w = window.innerWidth;
+		const h = window.innerHeight;
+		const screenH = window.screen.height;
+		const screenW = window.screen.width;
+		const isPortrait = h > w || screenH > screenW;
+
+		return (
+			h >= 900 ||
+			(w >= 600 && isPortrait) ||
+			(Math.max(screenH, screenW) >= 1280 && isPortrait)
+		);
+	}
+
+	function getDisplayMode(): DisplayMode {
+		const saved = localStorage.getItem(DISPLAY_MODE_KEY);
+		if (saved === 'kiosk' || saved === 'normal') return saved;
+		return detectKiosk() ? 'kiosk' : 'normal';
+	}
+
+	function applyDisplayMode(mode = getDisplayMode()) {
+		const carousel = document.querySelector<HTMLElement>('.carousel');
+		const toggle = document.querySelector<HTMLButtonElement>('.carousel-mode-toggle');
+		if (!carousel) return;
+
+		const isKiosk = mode === 'kiosk';
+		carousel.classList.toggle('carousel--kiosk', isKiosk);
+		toggle?.setAttribute('aria-pressed', String(isKiosk));
+	}
+
+	function initDisplayModeToggle() {
+		const toggle = document.querySelector<HTMLButtonElement>('.carousel-mode-toggle');
+		if (!toggle || toggle.dataset.bound === 'true') return;
+
+		toggle.dataset.bound = 'true';
+		applyDisplayMode();
+
+		toggle.addEventListener('click', () => {
+			const nextMode: DisplayMode =
+				toggle.getAttribute('aria-pressed') === 'true' ? 'normal' : 'kiosk';
+			localStorage.setItem(DISPLAY_MODE_KEY, nextMode);
+			applyDisplayMode(nextMode);
+		});
+	}
 
 	function initCarousel() {
 		const el = document.querySelector<HTMLElement>('.sports-swiper');
@@ -110,18 +169,36 @@ const slides = [
 				paginationBulletMessage: 'Ir al slide {{index}}',
 			},
 		});
+
+		initDisplayModeToggle();
 	}
 
 	initCarousel();
-	document.addEventListener('astro:page-load', initCarousel);
+	applyDisplayMode();
+	window.addEventListener('resize', () => {
+		if (!localStorage.getItem(DISPLAY_MODE_KEY)) {
+			applyDisplayMode();
+		}
+	});
+	document.addEventListener('astro:page-load', () => {
+		initCarousel();
+		applyDisplayMode();
+	});
 </script>
 
 <style>
 	.carousel {
 		position: relative;
 		width: 100vw;
+		width: 100dvw;
+		height: 100vh;
 		height: 100dvh;
+		min-height: -webkit-fill-available;
 		background: radial-gradient(ellipse at center, #142014 0%, #0a1209 70%);
+	}
+
+	.carousel--kiosk {
+		background: #0a1209;
 	}
 
 	.sports-swiper {
@@ -145,6 +222,84 @@ const slides = [
 		user-select: none;
 		-webkit-user-drag: none;
 		pointer-events: none;
+	}
+
+	.carousel:not(.carousel--kiosk) .swiper-slide img {
+		object-fit: contain;
+	}
+
+	@media (min-width: 600px) {
+		.carousel:not(.carousel--kiosk) .swiper-slide img {
+			max-width: min(100%, 480px);
+		}
+	}
+
+	.carousel--kiosk .swiper-slide {
+		padding: 0;
+	}
+
+	.carousel--kiosk .swiper-slide img {
+		object-fit: cover;
+		width: 100%;
+		height: 100%;
+		max-width: none;
+	}
+
+	.carousel--kiosk .carousel-hint {
+		display: none;
+	}
+
+	.carousel-mode-toggle {
+		position: absolute;
+		top: calc(0.45rem + env(safe-area-inset-top));
+		right: calc(0.45rem + env(safe-area-inset-right));
+		z-index: 10;
+		padding: 0.4rem;
+		border: none;
+		background: transparent;
+		cursor: pointer;
+		opacity: 0.1;
+		transition: opacity 0.35s ease;
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	.carousel-mode-toggle:hover,
+	.carousel-mode-toggle:focus-visible,
+	.carousel-mode-toggle:active {
+		opacity: 0.5;
+		outline: none;
+	}
+
+	.carousel-mode-toggle__track {
+		display: block;
+		width: 1.35rem;
+		height: 0.75rem;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.2);
+		position: relative;
+		transition: background 0.25s ease;
+	}
+
+	.carousel-mode-toggle[aria-pressed='true'] .carousel-mode-toggle__track {
+		background: rgba(255, 255, 255, 0.35);
+	}
+
+	.carousel-mode-toggle__thumb {
+		position: absolute;
+		top: 1px;
+		left: 1px;
+		width: calc(0.75rem - 2px);
+		height: calc(0.75rem - 2px);
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.45);
+		transition:
+			transform 0.25s ease,
+			background 0.25s ease;
+	}
+
+	.carousel-mode-toggle[aria-pressed='true'] .carousel-mode-toggle__thumb {
+		transform: translateX(0.6rem);
+		background: rgba(255, 255, 255, 0.7);
 	}
 
 	.carousel-hint {
@@ -191,12 +346,6 @@ const slides = [
 		}
 		50% {
 			transform: translateX(4px);
-		}
-	}
-
-	@media (min-width: 768px) {
-		.swiper-slide img {
-			max-width: min(100%, 480px);
 		}
 	}
 </style>
@@ -269,6 +418,15 @@ const slides = [
 	.sports-swiper .swiper-pagination-bullet-active {
 		background: #fff;
 		transform: scale(1.35);
+	}
+
+	.carousel--kiosk .sports-swiper .swiper-pagination {
+		bottom: 0.5rem;
+	}
+
+	.carousel--kiosk .sports-swiper .swiper-pagination-bullet {
+		width: 0.35rem;
+		height: 0.35rem;
 	}
 
 	@media (hover: none), (pointer: coarse) {
