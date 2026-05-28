@@ -126,12 +126,14 @@ import { FALLBACK_SLIDES } from '../lib/fallbackSlides';
 		if (el) delete el.dataset.initialized;
 	}
 
-	function mountSwiper() {
+	function mountSwiper(slideCount: number) {
 		const el = document.querySelector<HTMLElement>('.sports-swiper');
 		if (!el) return;
 
 		destroySwiper();
 		el.dataset.initialized = 'true';
+
+		const enableLoop = slideCount > 1;
 
 		swiperInstance = new Swiper(el, {
 			modules: [Navigation, Pagination, EffectCreative, Keyboard, Mousewheel, A11y, Autoplay],
@@ -150,11 +152,11 @@ import { FALLBACK_SLIDES } from '../lib/fallbackSlides';
 					opacity: 0,
 				},
 			},
-			loop: true,
+			loop: enableLoop,
 			speed: 650,
 			autoplay: {
 				delay: 10000,
-				pauseOnMouseEnter: true,
+				pauseOnMouseEnter: false,
 				disableOnInteraction: false,
 			},
 			grabCursor: true,
@@ -180,6 +182,9 @@ import { FALLBACK_SLIDES } from '../lib/fallbackSlides';
 			},
 		});
 
+		requestAnimationFrame(() => {
+			swiperInstance?.autoplay?.start();
+		});
 	}
 
 	function renderSlides(slides: CarouselSlide[]) {
@@ -215,7 +220,7 @@ import { FALLBACK_SLIDES } from '../lib/fallbackSlides';
 		if (signature === slidesContentSignature && swiperInstance) return;
 		slidesContentSignature = signature;
 		renderSlides(slides);
-		mountSwiper();
+		mountSwiper(slides.length);
 		applyDisplayMode();
 	}
 
@@ -247,11 +252,17 @@ import { FALLBACK_SLIDES } from '../lib/fallbackSlides';
 			pollTimer = null;
 		}
 		initDisplayModeToggle();
-		slidesContentSignature = fallbackSignature();
-		if (!swiperInstance) {
-			mountSwiper();
-		}
 		applyDisplayMode();
+
+		const wrapper = document.querySelector<HTMLElement>('[data-agenda-wrapper]');
+		const initialCount =
+			wrapper?.querySelectorAll('.swiper-slide').length ?? FALLBACK_SLIDES.length;
+
+		if (!swiperInstance) {
+			slidesContentSignature = fallbackSignature();
+			mountSwiper(initialCount);
+		}
+
 		void refreshFromApi();
 		startPolling();
 	}

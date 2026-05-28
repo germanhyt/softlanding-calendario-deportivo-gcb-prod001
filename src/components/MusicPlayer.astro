@@ -1,4 +1,10 @@
-<audio class="agenda-music" data-agenda-audio preload="metadata" aria-hidden="true"></audio>
+<audio
+	class="agenda-music"
+	data-agenda-audio
+	preload="auto"
+	playsinline
+	aria-hidden="true"
+></audio>
 
 <script>
 	import {
@@ -9,12 +15,20 @@
 		type PublicMusica,
 		type PublicTrack,
 	} from '../lib/agendaClient';
+	import {
+		bindMediaUnlock,
+		playAudioDirect,
+		unbindMediaUnlock,
+		waitForAudioReady,
+	} from '../lib/kioskMedia';
 
 	let pollTimer: ReturnType<typeof setInterval> | null = null;
+	let playRetryTimer: ReturnType<typeof setInterval> | null = null;
 	let tracks: PublicTrack[] = [];
 	let trackIndex = 0;
 	let contentSignature = '';
 	let unlockBound = false;
+	let loadingTrackUrl = '';
 
 	function getAudio(): HTMLAudioElement | null {
 		return document.querySelector<HTMLAudioElement>('[data-agenda-audio]');
@@ -24,37 +38,52 @@
 		return [...list].sort((a, b) => a.orden - b.orden);
 	}
 
-	function playCurrent() {
+	async function setTrackSource(audio: HTMLAudioElement, url: string): Promise<boolean> {
+		if (audio.dataset.trackUrl === url && audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+			return true;
+		}
+
+		audio.dataset.trackUrl = url;
+		audio.src = url;
+		audio.load();
+		loadingTrackUrl = url;
+		const ready = await waitForAudioReady(audio);
+		if (loadingTrackUrl !== url) return false;
+		return ready;
+	}
+
+	function ensureUnlockListener() {
+		if (unlockBound) return;
+		unlockBound = true;
+		bindMediaUnlock(() => {
+			void playCurrent();
+		});
+	}
+
+	async function playCurrent(): Promise<void> {
 		const audio = getAudio();
 		if (!audio || tracks.length === 0) return;
 
 		const track = tracks[trackIndex];
-		if (audio.src !== track.url) {
-			audio.src = track.url;
+		const loaded = await setTrackSource(audio, track.url);
+		if (!loaded) {
+			ensureUnlockListener();
+			return;
 		}
-		void audio.play().catch(() => {
-			bindUnlockOnce();
-		});
-	}
 
-	function bindUnlockOnce() {
-		if (unlockBound) return;
-		unlockBound = true;
-
-		const unlock = () => {
-			playCurrent();
-			document.removeEventListener('pointerdown', unlock);
-			document.removeEventListener('keydown', unlock);
+		const ok = await playAudioDirect(audio);
+		if (ok) {
+			unbindMediaUnlock();
 			unlockBound = false;
-		};
+			return;
+		}
 
-		document.addEventListener('pointerdown', unlock, { once: true });
-		document.addEventListener('keydown', unlock, { once: true });
+		ensureUnlockListener();
 	}
 
 	function applyPlaylist(data: PublicMusica) {
 		const signature = tracksSignature(data);
-		if (signature === contentSignature) return;
+		const samePlaylist = signature === contentSignature;
 		contentSignature = signature;
 
 		const audio = getAudio();
@@ -63,15 +92,20 @@
 		if (!data.playlistEnabled || !data.tracks?.length) {
 			tracks = [];
 			trackIndex = 0;
+			loadingTrackUrl = '';
+			delete audio.dataset.trackUrl;
 			audio.pause();
 			audio.removeAttribute('src');
 			audio.load();
+			unbindMediaUnlock();
+			unlockBound = false;
 			return;
 		}
 
 		tracks = sortTracks(data.tracks);
-		trackIndex = 0;
-		playCurrent();
+		if (!samePlaylist) trackIndex = 0;
+
+		void playCurrent();
 	}
 
 	async function refreshMusica() {
@@ -81,12 +115,16 @@
 		} catch {
 			const audio = getAudio();
 			if (audio) {
+				loadingTrackUrl = '';
+				delete audio.dataset.trackUrl;
 				audio.pause();
 				audio.removeAttribute('src');
 				audio.load();
 			}
 			tracks = [];
 			contentSignature = '';
+			unbindMediaUnlock();
+			unlockBound = false;
 		}
 	}
 
@@ -98,8 +136,26 @@
 		audio.addEventListener('ended', () => {
 			if (tracks.length === 0) return;
 			trackIndex = (trackIndex + 1) % tracks.length;
-			playCurrent();
+			void playCurrent();
 		});
+
+		audio.addEventListener('error', () => {
+			if (tracks.length <= 1) {
+				ensureUnlockListener();
+				return;
+			}
+			trackIndex = (trackIndex + 1) % tracks.length;
+			void playCurrent();
+		});
+	}
+
+	function startPlayRetry() {
+		if (playRetryTimer) clearInterval(playRetryTimer);
+		playRetryTimer = setInterval(() => {
+			const audio = getAudio();
+			if (!audio || tracks.length === 0) return;
+			if (audio.paused && !audio.ended) void playCurrent();
+		}, 4000);
 	}
 
 	function startPolling() {
@@ -113,6 +169,7 @@
 		bindAudioEvents();
 		void refreshMusica();
 		startPolling();
+		startPlayRetry();
 	}
 
 	bootstrap();
@@ -120,12 +177,13 @@
 	document.addEventListener('astro:page-load', bootstrap);
 
 	document.addEventListener('astro:before-preparation', () => {
-		if (pollTimer) {
-			clearInterval(pollTimer);
-			pollTimer = null;
-		}
-		const audio = getAudio();
-		audio?.pause();
+		if (pollTimer) clearInterval(pollTimer);
+		if (playRetryTimer) clearInterval(playRetryTimer);
+		pollTimer = null;
+		playRetryTimer = null;
+		unbindMediaUnlock();
+		unlockBound = false;
+		getAudio()?.pause();
 	});
 </script>
 
