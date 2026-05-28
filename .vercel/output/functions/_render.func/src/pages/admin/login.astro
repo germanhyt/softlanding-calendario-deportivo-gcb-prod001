@@ -1,0 +1,74 @@
+---
+import '../../styles/admin.css';
+---
+
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="robots" content="noindex, nofollow" />
+		<title>Login | Catelera Admin</title>
+	</head>
+	<body>
+		<div class="admin-login">
+			<form class="admin-card" id="login-form">
+				<h2>Ingresar</h2>
+				<p>Panel administrable sin base de datos.</p>
+				<div class="admin-grid">
+					<div class="admin-field">
+						<label for="username">Usuario</label>
+						<input id="username" name="username" autocomplete="username" required />
+					</div>
+					<div class="admin-field">
+						<label for="password">Contraseña</label>
+						<input
+							id="password"
+							name="password"
+							type="password"
+							autocomplete="current-password"
+							required
+						/>
+					</div>
+				</div>
+				<div class="admin-actions">
+					<button class="admin-btn" type="submit">Entrar</button>
+				</div>
+				<p class="admin-status hidden" id="login-status"></p>
+			</form>
+		</div>
+		<script>
+			const form = document.getElementById('login-form') as HTMLFormElement;
+			const status = document.getElementById('login-status') as HTMLParagraphElement;
+
+			form.addEventListener('submit', async (event) => {
+				event.preventDefault();
+				status.classList.remove('hidden', 'is-error', 'is-success');
+				status.textContent = 'Verificando...';
+
+				const formData = new FormData(form);
+				const response = await fetch('/api/auth/login', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						username: formData.get('username'),
+						password: formData.get('password'),
+					}),
+				});
+
+				if (!response.ok) {
+					const data = await response.json();
+					status.classList.add('is-error');
+					status.textContent = data.error ?? 'No se pudo iniciar sesión';
+					return;
+				}
+
+				window.location.href = '/admin';
+			});
+		</script>
+	</body>
+</html>
+
+<style is:global>
+	@import '../../styles/admin.css';
+</style>

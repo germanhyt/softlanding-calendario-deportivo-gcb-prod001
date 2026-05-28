@@ -1,0 +1,202 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+---
+
+<AdminLayout title="Música">
+	<section class="admin-card">
+		<h2>Playlist de fondo</h2>
+		<p>Activa o desactiva la música en la pantalla pública y administra los archivos de audio.</p>
+
+		<label class="admin-checkbox-row" for="playlist-enabled">
+			<input id="playlist-enabled" type="checkbox" />
+			<span>Habilitar música de fondo en la pantalla pública</span>
+		</label>
+	</section>
+
+	<section class="admin-card">
+		<h3>Pistas</h3>
+		<p class="admin-list__hint">Arrastra desde ⋮⋮ para definir el orden de reproducción.</p>
+		<div class="admin-list" id="tracks-list"></div>
+
+		<form class="admin-grid" id="music-form" style="margin-top: 1rem">
+			<div class="admin-field">
+				<label for="track-file">Subir audio</label>
+				<input id="track-file" name="file" type="file" accept="audio/*" />
+			</div>
+			<div class="admin-field">
+				<label for="track-title">Título</label>
+				<input id="track-title" placeholder="Ej. Ambiente lounge" />
+			</div>
+			<div class="admin-actions">
+				<button class="admin-btn" type="submit">Agregar pista</button>
+				<button class="admin-btn admin-btn--ghost" type="button" id="save-music-btn">Guardar cambios</button>
+			</div>
+		</form>
+		<p class="admin-status hidden" id="music-status"></p>
+	</section>
+
+	<script>
+		import { bindSortableList, escapeHtml, updatePositionNumbers } from '../../lib/admin-ui';
+
+		type Track = { id: string; title: string; src: string; order: number };
+		type MusicData = { playlistEnabled: boolean; tracks: Track[] };
+
+		let music: MusicData;
+		let sortableReady = false;
+
+		const tracksList = document.getElementById('tracks-list') as HTMLDivElement;
+		const enabledInput = document.getElementById('playlist-enabled') as HTMLInputElement;
+		const status = document.getElementById('music-status') as HTMLParagraphElement;
+
+		function setStatus(message: string, type: 'success' | 'error' | '' = '') {
+			status.classList.remove('hidden', 'is-success', 'is-error');
+			status.textContent = message;
+			if (type) status.classList.add(type === 'success' ? 'is-success' : 'is-error');
+		}
+
+		function syncTracksFromDom() {
+			tracksList.querySelectorAll('[data-sortable-item]').forEach((item, index) => {
+				const id = item.getAttribute('data-id');
+				const track = music.tracks.find((entry) => entry.id === id);
+				if (!track) return;
+				track.title = (item.querySelector('[data-field="title"]') as HTMLInputElement).value;
+				track.src = (item.querySelector('[data-field="src"]') as HTMLInputElement).value;
+				track.order = index + 1;
+			});
+		}
+
+		function reorderTracks(orderedIds: string[]) {
+			syncTracksFromDom();
+			const map = new Map(music.tracks.map((track) => [track.id, track]));
+			music.tracks.splice(0, music.tracks.length, ...orderedIds.map((id, index) => {
+				const track = map.get(id);
+				if (!track) throw new Error('Track missing');
+				track.order = index + 1;
+				return track;
+			}));
+			renderTracks();
+		}
+
+		function ensureSortable() {
+			if (sortableReady) return;
+			bindSortableList(tracksList, reorderTracks);
+			sortableReady = true;
+		}
+
+		function renderTracks() {
+			enabledInput.checked = music.playlistEnabled;
+			const tracks = [...music.tracks].sort((a, b) => a.order - b.order);
+
+			if (!tracks.length) {
+				tracksList.innerHTML = '<p class="admin-empty">No hay pistas. Sube el primer audio abajo.</p>';
+				return;
+			}
+
+			tracksList.innerHTML = tracks
+				.map(
+					(track, index) => `
+					<article class="admin-item" data-sortable-item data-id="${track.id}" draggable="true">
+						<div class="admin-item__head">
+							<span class="admin-item__handle" title="Arrastrar para reordenar">⋮⋮</span>
+							<span class="admin-item__position">${index + 1}</span>
+							<span class="admin-item__title">${escapeHtml(track.title || 'Sin título')}</span>
+							<button class="admin-btn admin-btn--danger admin-btn--sm" type="button" data-action="delete">Eliminar</button>
+						</div>
+						<div class="admin-item__body">
+							<audio class="admin-item__audio" controls src="${escapeHtml(track.src)}" preload="metadata"></audio>
+							<div class="admin-item__fields">
+								<div class="admin-field">
+									<label>Título</label>
+									<input data-field="title" value="${escapeHtml(track.title)}" />
+								</div>
+								<div class="admin-field">
+									<label>Archivo</label>
+									<input data-field="src" value="${escapeHtml(track.src)}" readonly />
+								</div>
+							</div>
+						</div>
+					</article>
+				`,
+				)
+				.join('');
+
+			ensureSortable();
+			updatePositionNumbers(tracksList);
+		}
+
+		async function loadMusic() {
+			const response = await fetch('/api/admin/music');
+			music = await response.json();
+			renderTracks();
+		}
+
+		tracksList.addEventListener('click', (event) => {
+			const target = event.target as HTMLElement;
+			if (target.getAttribute('data-action') !== 'delete') return;
+
+			const item = target.closest('[data-sortable-item]') as HTMLElement;
+			const id = item?.getAttribute('data-id');
+			const index = music.tracks.findIndex((track) => track.id === id);
+			if (index < 0) return;
+
+			music.tracks.splice(index, 1);
+			music.tracks.forEach((track, order) => {
+				track.order = order + 1;
+			});
+			renderTracks();
+		});
+
+		document.getElementById('music-form')?.addEventListener('submit', async (event) => {
+			event.preventDefault();
+			const fileInput = document.getElementById('track-file') as HTMLInputElement;
+			const titleInput = document.getElementById('track-title') as HTMLInputElement;
+			const file = fileInput.files?.[0];
+			if (!file) return;
+
+			setStatus('Subiendo audio...');
+			const formData = new FormData();
+			formData.append('file', file);
+			formData.append('folder', 'music');
+
+			const upload = await fetch('/api/admin/upload', { method: 'POST', body: formData });
+			const uploaded = await upload.json();
+			if (!upload.ok) {
+				setStatus(uploaded.error ?? 'Error al subir', 'error');
+				return;
+			}
+
+			music.tracks.push({
+				id: `track-${Date.now().toString(36)}`,
+				title: titleInput.value || file.name,
+				src: uploaded.src,
+				order: music.tracks.length + 1,
+			});
+
+			fileInput.value = '';
+			titleInput.value = '';
+			renderTracks();
+			setStatus('Pista agregada. Recuerda guardar cambios.', 'success');
+		});
+
+		document.getElementById('save-music-btn')?.addEventListener('click', async () => {
+			syncTracksFromDom();
+			music.playlistEnabled = enabledInput.checked;
+
+			const response = await fetch('/api/admin/music', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify(music),
+			});
+
+			if (!response.ok) {
+				setStatus('No se pudo guardar', 'error');
+				return;
+			}
+
+			setStatus('Playlist guardada correctamente', 'success');
+			await loadMusic();
+		});
+
+		loadMusic();
+	</script>
+</AdminLayout>

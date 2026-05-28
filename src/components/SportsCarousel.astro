@@ -1,30 +1,5 @@
 ---
-const slides = [
-	{
-		src: '/slides/01-agenda-deportiva.png',
-		alt: 'Agenda Deportiva — 25 al 31 de Mayo',
-	},
-	{
-		src: '/slides/02-pasion-deporte.png',
-		alt: 'La pasión del deporte se vive aquí — Refugio Gastronómico',
-	},
-	{
-		src: '/slides/03-futbol-internacional.png',
-		alt: 'Fútbol Internacional — Partidos destacados',
-	},
-	{
-		src: '/slides/04-futbol-peruano.png',
-		alt: 'Fútbol Peruano — Partidos destacados',
-	},
-	{
-		src: '/slides/05-voley-peruano.png',
-		alt: 'Vóley Peruano — Partidos destacados',
-	},
-	{
-		src: '/slides/06-ufc.png',
-		alt: 'UFC — Peleas destacadas',
-	},
-];
+import { FALLBACK_SLIDES } from '../lib/fallbackSlides';
 ---
 
 <section class="carousel" aria-label="Agenda deportiva semanal">
@@ -40,11 +15,15 @@ const slides = [
 	</button>
 
 	<div class="swiper sports-swiper">
-		<div class="swiper-wrapper">
+		<div class="swiper-wrapper" data-agenda-wrapper>
 			{
-				slides.map((slide) => (
+				FALLBACK_SLIDES.map((slide, index) => (
 					<div class="swiper-slide">
-						<img src={slide.src} alt={slide.alt} loading={slide.src.includes('01-') ? 'eager' : 'lazy'} />
+						<img
+							src={slide.src}
+							alt={slide.alt}
+							loading={index === 0 ? 'eager' : 'lazy'}
+						/>
 					</div>
 				))
 			}
@@ -69,8 +48,29 @@ const slides = [
 	import 'swiper/css/pagination';
 	import 'swiper/css/effect-creative';
 
+	import {
+		fetchProgramacion,
+		getApiBase,
+		getPollIntervalMs,
+		slidesSignature,
+		type PublicSlide,
+	} from '../lib/agendaClient';
+	import { FALLBACK_SLIDES, type CarouselSlide } from '../lib/fallbackSlides';
+
 	const DISPLAY_MODE_KEY = 'catelera-display-mode';
 	type DisplayMode = 'kiosk' | 'normal';
+
+	let swiperInstance: Swiper | null = null;
+	let slidesContentSignature = '';
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+	function escapeAttr(value: string): string {
+		return value
+			.replace(/&/g, '&amp;')
+			.replace(/"/g, '&quot;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;');
+	}
 
 	function detectKiosk(): boolean {
 		const w = window.innerWidth;
@@ -117,13 +117,23 @@ const slides = [
 		});
 	}
 
-	function initCarousel() {
+	function destroySwiper() {
+		if (swiperInstance) {
+			swiperInstance.destroy(true, true);
+			swiperInstance = null;
+		}
 		const el = document.querySelector<HTMLElement>('.sports-swiper');
-		if (!el || el.dataset.initialized === 'true') return;
+		if (el) delete el.dataset.initialized;
+	}
 
+	function mountSwiper() {
+		const el = document.querySelector<HTMLElement>('.sports-swiper');
+		if (!el) return;
+
+		destroySwiper();
 		el.dataset.initialized = 'true';
 
-		new Swiper(el, {
+		swiperInstance = new Swiper(el, {
 			modules: [Navigation, Pagination, EffectCreative, Keyboard, Mousewheel, A11y, Autoplay],
 			effect: 'creative',
 			creativeEffect: {
@@ -170,19 +180,100 @@ const slides = [
 			},
 		});
 
-		initDisplayModeToggle();
 	}
 
-	initCarousel();
-	applyDisplayMode();
+	function renderSlides(slides: CarouselSlide[]) {
+		const wrapper = document.querySelector<HTMLElement>('[data-agenda-wrapper]');
+		if (!wrapper) return;
+
+		wrapper.innerHTML = slides
+			.map(
+				(slide, index) => `
+			<div class="swiper-slide">
+				<img src="${escapeAttr(slide.src)}" alt="${escapeAttr(slide.alt)}" loading="${index === 0 ? 'eager' : 'lazy'}" />
+			</div>`
+			)
+			.join('');
+	}
+
+	function mapApiSlides(slides: PublicSlide[]): CarouselSlide[] {
+		return [...slides]
+			.sort((a, b) => a.orden - b.orden)
+			.map((slide) => ({ src: slide.url, alt: slide.alt || `Slide ${slide.orden}` }));
+	}
+
+	function resolveSlides(apiSlides: PublicSlide[]): CarouselSlide[] {
+		const mapped = mapApiSlides(apiSlides);
+		return mapped.length > 0 ? mapped : FALLBACK_SLIDES;
+	}
+
+	function fallbackSignature(): string {
+		return `fallback:${FALLBACK_SLIDES.map((s) => s.src).join('|')}`;
+	}
+
+	function applySlides(slides: CarouselSlide[], signature: string) {
+		if (signature === slidesContentSignature && swiperInstance) return;
+		slidesContentSignature = signature;
+		renderSlides(slides);
+		mountSwiper();
+		applyDisplayMode();
+	}
+
+	async function refreshFromApi() {
+		try {
+			const data = await fetchProgramacion(getApiBase());
+			const slides = resolveSlides(data.slides ?? []);
+			const signature =
+				data.slides?.length > 0 ? slidesSignature(data.slides) : fallbackSignature();
+			applySlides(slides, signature);
+		} catch {
+			const signature = fallbackSignature();
+			if (slidesContentSignature !== signature) {
+				applySlides(FALLBACK_SLIDES, signature);
+			}
+		}
+	}
+
+	function startPolling() {
+		if (pollTimer) clearInterval(pollTimer);
+		pollTimer = setInterval(() => {
+			void refreshFromApi();
+		}, getPollIntervalMs());
+	}
+
+	function bootstrap() {
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = null;
+		}
+		initDisplayModeToggle();
+		slidesContentSignature = fallbackSignature();
+		if (!swiperInstance) {
+			mountSwiper();
+		}
+		applyDisplayMode();
+		void refreshFromApi();
+		startPolling();
+	}
+
+	bootstrap();
+
 	window.addEventListener('resize', () => {
 		if (!localStorage.getItem(DISPLAY_MODE_KEY)) {
 			applyDisplayMode();
 		}
 	});
+
 	document.addEventListener('astro:page-load', () => {
-		initCarousel();
-		applyDisplayMode();
+		bootstrap();
+	});
+
+	document.addEventListener('astro:before-preparation', () => {
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = null;
+		}
+		destroySwiper();
 	});
 </script>
 
@@ -204,49 +295,6 @@ const slides = [
 	.sports-swiper {
 		width: 100%;
 		height: 100%;
-	}
-
-	.swiper-slide {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
-			env(safe-area-inset-left);
-	}
-
-	.swiper-slide img {
-		width: 100%;
-		height: 100%;
-		object-fit: contain;
-		object-position: center;
-		user-select: none;
-		-webkit-user-drag: none;
-		pointer-events: none;
-	}
-
-	.carousel:not(.carousel--kiosk) .swiper-slide img {
-		object-fit: contain;
-	}
-
-	@media (min-width: 600px) {
-		.carousel:not(.carousel--kiosk) .swiper-slide img {
-			max-width: min(100%, 480px);
-		}
-	}
-
-	.carousel--kiosk .swiper-slide {
-		padding: 0;
-	}
-
-	.carousel--kiosk .swiper-slide img {
-		object-fit: cover;
-		width: 100%;
-		height: 100%;
-		max-width: none;
-	}
-
-	.carousel--kiosk .carousel-hint {
-		display: none;
 	}
 
 	.carousel-mode-toggle {
@@ -302,6 +350,10 @@ const slides = [
 		background: rgba(255, 255, 255, 0.7);
 	}
 
+	.carousel--kiosk .carousel-hint {
+		display: none;
+	}
+
 	.carousel-hint {
 		position: absolute;
 		bottom: calc(1.25rem + env(safe-area-inset-bottom));
@@ -351,6 +403,46 @@ const slides = [
 </style>
 
 <style is:global>
+	/* Slides: global para que innerHTML dinámico (API) conserve el mismo layout que el SSR. */
+	.sports-swiper .swiper-slide {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+			env(safe-area-inset-left);
+	}
+
+	.sports-swiper .swiper-slide img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+		object-position: center;
+		user-select: none;
+		-webkit-user-drag: none;
+		pointer-events: none;
+	}
+
+	.carousel:not(.carousel--kiosk) .sports-swiper .swiper-slide img {
+		object-fit: contain;
+	}
+
+	@media (min-width: 600px) {
+		.carousel:not(.carousel--kiosk) .sports-swiper .swiper-slide img {
+			max-width: min(100%, 480px);
+		}
+	}
+
+	.carousel--kiosk .sports-swiper .swiper-slide {
+		padding: 0;
+	}
+
+	.carousel--kiosk .sports-swiper .swiper-slide img {
+		object-fit: cover;
+		width: 100%;
+		height: 100%;
+		max-width: none;
+	}
+
 	.sports-swiper .swiper-button-prev,
 	.sports-swiper .swiper-button-next {
 		color: #fff;

@@ -1,0 +1,140 @@
+<audio class="agenda-music" data-agenda-audio preload="metadata" aria-hidden="true"></audio>
+
+<script>
+	import {
+		fetchMusica,
+		getApiBase,
+		getPollIntervalMs,
+		tracksSignature,
+		type PublicMusica,
+		type PublicTrack,
+	} from '../lib/agendaClient';
+
+	let pollTimer: ReturnType<typeof setInterval> | null = null;
+	let tracks: PublicTrack[] = [];
+	let trackIndex = 0;
+	let contentSignature = '';
+	let unlockBound = false;
+
+	function getAudio(): HTMLAudioElement | null {
+		return document.querySelector<HTMLAudioElement>('[data-agenda-audio]');
+	}
+
+	function sortTracks(list: PublicTrack[]): PublicTrack[] {
+		return [...list].sort((a, b) => a.orden - b.orden);
+	}
+
+	function playCurrent() {
+		const audio = getAudio();
+		if (!audio || tracks.length === 0) return;
+
+		const track = tracks[trackIndex];
+		if (audio.src !== track.url) {
+			audio.src = track.url;
+		}
+		void audio.play().catch(() => {
+			bindUnlockOnce();
+		});
+	}
+
+	function bindUnlockOnce() {
+		if (unlockBound) return;
+		unlockBound = true;
+
+		const unlock = () => {
+			playCurrent();
+			document.removeEventListener('pointerdown', unlock);
+			document.removeEventListener('keydown', unlock);
+			unlockBound = false;
+		};
+
+		document.addEventListener('pointerdown', unlock, { once: true });
+		document.addEventListener('keydown', unlock, { once: true });
+	}
+
+	function applyPlaylist(data: PublicMusica) {
+		const signature = tracksSignature(data);
+		if (signature === contentSignature) return;
+		contentSignature = signature;
+
+		const audio = getAudio();
+		if (!audio) return;
+
+		if (!data.playlistEnabled || !data.tracks?.length) {
+			tracks = [];
+			trackIndex = 0;
+			audio.pause();
+			audio.removeAttribute('src');
+			audio.load();
+			return;
+		}
+
+		tracks = sortTracks(data.tracks);
+		trackIndex = 0;
+		playCurrent();
+	}
+
+	async function refreshMusica() {
+		try {
+			const data = await fetchMusica(getApiBase());
+			applyPlaylist(data);
+		} catch {
+			const audio = getAudio();
+			if (audio) {
+				audio.pause();
+				audio.removeAttribute('src');
+				audio.load();
+			}
+			tracks = [];
+			contentSignature = '';
+		}
+	}
+
+	function bindAudioEvents() {
+		const audio = getAudio();
+		if (!audio || audio.dataset.bound === 'true') return;
+		audio.dataset.bound = 'true';
+
+		audio.addEventListener('ended', () => {
+			if (tracks.length === 0) return;
+			trackIndex = (trackIndex + 1) % tracks.length;
+			playCurrent();
+		});
+	}
+
+	function startPolling() {
+		if (pollTimer) clearInterval(pollTimer);
+		pollTimer = setInterval(() => {
+			void refreshMusica();
+		}, getPollIntervalMs());
+	}
+
+	function bootstrap() {
+		bindAudioEvents();
+		void refreshMusica();
+		startPolling();
+	}
+
+	bootstrap();
+
+	document.addEventListener('astro:page-load', bootstrap);
+
+	document.addEventListener('astro:before-preparation', () => {
+		if (pollTimer) {
+			clearInterval(pollTimer);
+			pollTimer = null;
+		}
+		const audio = getAudio();
+		audio?.pause();
+	});
+</script>
+
+<style>
+	.agenda-music {
+		position: absolute;
+		width: 0;
+		height: 0;
+		opacity: 0;
+		pointer-events: none;
+	}
+</style>

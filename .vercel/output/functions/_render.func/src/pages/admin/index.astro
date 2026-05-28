@@ -1,0 +1,37 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Inicio">
+	<section class="admin-card">
+		<h2>Panel de marketing</h2>
+		<p>Gestiona la cartelera deportiva en pocos pasos.</p>
+		<div style="display: flex; flex-direction: column; gap: 1rem;">
+			<div class="admin-steps">
+				<span class="admin-step is-active">1. Login</span>
+				<span class="admin-step is-active">2. Imágenes</span>
+				<span class="admin-step is-active">3. Música</span>
+			</div>
+
+			<div class="admin-actions">
+				<a class="admin-btn" href="/admin/slides">Gestionar imágenes</a>
+				<a class="admin-btn admin-btn--ghost" href="/admin/music"
+					>Gestionar música</a
+				>
+				<a class="admin-btn admin-btn--ghost" href="/admin/credentials"
+					>Credenciales</a
+				>
+			</div>
+		</div>
+	</section>
+
+	<!-- <section class="admin-card">
+		<h3>Datos</h3>
+		<p>Todo se guarda en archivos JSON dentro de la carpeta <code>data/</code>.</p>
+		<ul>
+			<li><strong>schedule.json</strong> — imágenes por semana o por día</li>
+			<li><strong>music.json</strong> — playlist y estado del sonido</li>
+			<li><strong>users.json</strong> — credenciales del admin (<a href="/admin/credentials">actualizar</a>)</li>
+		</ul>
+	</section> -->
+</AdminLayout>

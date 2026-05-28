@@ -1,0 +1,87 @@
+{
+	"viewMode": "week",
+	"activeWeekId": "2025-w21",
+	"activeDate": "2026-05-31",
+	"weeks": [
+		{
+			"id": "2025-w21",
+			"label": "25 al 31 de Mayo",
+			"startDate": "2025-05-25",
+			"endDate": "2025-05-31",
+			"slides": [
+				{
+					"id": "s1",
+					"src": "/slides/01-agenda-deportiva.png",
+					"alt": "Agenda Deportiva — 25 al 31 de Mayo",
+					"order": 1
+				},
+				{
+					"id": "s2",
+					"src": "/slides/02-pasion-deporte.png",
+					"alt": "La pasión del deporte se vive aquí",
+					"order": 2
+				},
+				{
+					"id": "s3",
+					"src": "/slides/03-futbol-internacional.png",
+					"alt": "Fútbol Internacional — Partidos destacados",
+					"order": 3
+				},
+				{
+					"id": "s4",
+					"src": "/slides/04-futbol-peruano.png",
+					"alt": "Fútbol Peruano — Partidos destacados",
+					"order": 4
+				},
+				{
+					"id": "s5",
+					"src": "/slides/05-voley-peruano.png",
+					"alt": "Vóley Peruano — Partidos destacados",
+					"order": 5
+				},
+				{
+					"id": "s6",
+					"src": "/slides/06-ufc.png",
+					"alt": "UFC — Peleas destacadas",
+					"order": 6
+				}
+			]
+		},
+		{
+			"id": "week-mpplfbal",
+			"label": "Nueva semana",
+			"startDate": "2026-05-28",
+			"endDate": "2026-05-28",
+			"slides": []
+		}
+	],
+	"days": [
+		{
+			"date": "2025-05-25",
+			"label": "Domingo 25",
+			"slides": [
+				{
+					"id": "s1",
+					"src": "/slides/01-agenda-deportiva.png",
+					"alt": "Agenda Deportiva — 25 al 31 de Mayo",
+					"order": 1
+				}
+			]
+		},
+		{
+			"date": "2026-05-31",
+			"label": "Nuevo día",
+			"slides": []
+		},
+		{
+			"date": "2026-05-28",
+			"label": "Nuevo día",
+			"slides": []
+		},
+		{
+			"date": "2026-05-28",
+			"label": "Nuevo día",
+			"slides": []
+		}
+	]
+}
